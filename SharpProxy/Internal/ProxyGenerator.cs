@@ -14,7 +14,8 @@ namespace SharpProxy.Internal
         {
             AssemblyName assemblyName = new AssemblyName("SharpProxyContainer");
 
-            this.proxyContainer = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+            this.proxyContainer = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+
             this.proxyModule = this.proxyContainer.DefineDynamicModule("SharpProxyContainer.dll");
 
             this.proxyBaseType = typeof(SharpProxyBase);
@@ -41,7 +42,7 @@ namespace SharpProxy.Internal
                 return null;
             }
 
-            Type _type = this.proxyModule.GetType(interfaces[0].Name + "$Proxy");
+            Type _type = this.proxyModule.GetType(interfaces[0].Name + "_Proxy");
 
             if(_type != null)
             {
@@ -61,7 +62,7 @@ namespace SharpProxy.Internal
                 }
             }
 
-            TypeBuilder proxyType = this.proxyModule.DefineType(interfaces[0].Name + "$Proxy",
+            TypeBuilder proxyType = this.proxyModule.DefineType(interfaces[0].Name + "_Proxy",
                                                                 TypeAttributes.Public | TypeAttributes.Class,
                                                                 proxyBaseType, interfaces);
 
@@ -85,7 +86,7 @@ namespace SharpProxy.Internal
 
         private void ImplementConstructor(TypeBuilder proxyType)
         {
-            ConstructorBuilder ctorBuilder = proxyType.DefineConstructor(MethodAttributes.Public,
+            ConstructorBuilder ctorBuilder = proxyType.DefineConstructor(MethodAttributes.Public | MethodAttributes.HideBySig,
                                                                          CallingConventions.Standard,
                                                                          new Type[] { typeof(InvocationHandlerManager) });
 
@@ -107,19 +108,44 @@ namespace SharpProxy.Internal
                 paramTypes[i] = methodParams[i].ParameterType;
             }
 
-            MethodBuilder methodBuilder = proxyType.DefineMethod(parentMethod.Name, MethodAttributes.Public | MethodAttributes.Virtual, parentMethod.ReturnType, paramTypes);
-
-            ILGenerator ilGen = methodBuilder.GetILGenerator();
-
-            ilGen.Emit(OpCodes.Ldarg_0);
-            ilGen.EmitCall(OpCodes.Call, typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static), null);
+            MethodBuilder methodBuilder = proxyType.DefineMethod(parentMethod.Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final, parentMethod.ReturnType, paramTypes);
 
             for (int i = 0; i < methodParams.Length; i++)
             {
-                ilGen.Emit(OpCodes.Ldarg, (short)(i + 1));
+                methodBuilder.DefineParameter(i + 1, methodParams[i].Attributes, methodParams[i].Name);
             }
 
-            ilGen.EmitCall(OpCodes.Call, proxyBaseType.GetMethod("ProcessMethodInvocation"), null);
+            ILGenerator ilGen = methodBuilder.GetILGenerator();
+
+            LocalBuilder methodArgs = ilGen.DeclareLocal(typeof(object[]));
+
+            ilGen.Emit(OpCodes.Ldc_I4, methodParams.Length);
+            ilGen.Emit(OpCodes.Newarr, typeof(object));
+
+            for (int i = 0; i < methodParams.Length; i++)
+            {
+                ilGen.Emit(OpCodes.Dup);
+                ilGen.Emit(OpCodes.Ldc_I4, i);
+                ilGen.Emit(OpCodes.Ldarg, (short)(i + 1));
+                ilGen.Emit(OpCodes.Stelem_Ref);
+                
+            }
+
+            ilGen.Emit(OpCodes.Stloc, methodArgs);
+
+            ilGen.Emit(OpCodes.Ldarg_0);
+            ilGen.EmitCall(OpCodes.Call, typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static), null);
+            ilGen.Emit(OpCodes.Castclass, typeof(MethodInfo));
+
+            ilGen.Emit(OpCodes.Ldloc, methodArgs);
+
+            ilGen.Emit(OpCodes.Call, proxyBaseType.GetMethod("ProcessMethodInvocation"));
+
+            if(parentMethod.ReturnType == typeof(void))
+            {
+                ilGen.Emit(OpCodes.Pop);
+            }
+
             ilGen.Emit(OpCodes.Ret);
 
             return methodBuilder;

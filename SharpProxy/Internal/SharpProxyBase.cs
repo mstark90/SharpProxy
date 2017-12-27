@@ -12,7 +12,7 @@ namespace SharpProxy.Internal
             this.invocationHandler = invocationHandler;
         }
 
-        public object ProcessMethodInvocation(MethodInfo callingMethod, params object[] args)
+        public object ProcessMethodInvocation(MethodInfo callingMethod, object[] args)
         {
             Dictionary<string, object> _args = new Dictionary<string, object>();
             ParameterInfo[] _params = callingMethod.GetParameters();

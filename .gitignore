@@ -3,3 +3,7 @@
 ################################################################################
 
 /.vs/SharpProxy
+/SharpProxy/bin/Debug
+/SharpProxy/obj
+/SharpProxyTest/bin/Debug/net461
+/SharpProxyTest/obj
