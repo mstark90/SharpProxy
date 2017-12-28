@@ -6,7 +6,7 @@ using SharpProxy.Internal;
 
 namespace SharpProxyTest
 {
-    public class IConsoleWriterProxy : SharpProxyBase, IConsoleWriter
+    public class IConsoleWriterProxy : SharpProxyBase
     {
         public IConsoleWriterProxy(InvocationHandlerManager handlerManager) : base(handlerManager)
         {
@@ -33,6 +33,7 @@ namespace SharpProxyTest
             };
 
             this.ProcessMethodInvocation(((MethodInfo)MethodBase.GetCurrentMethod()), args);
+
         }
     }
 }

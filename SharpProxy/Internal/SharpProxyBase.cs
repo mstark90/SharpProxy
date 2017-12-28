@@ -24,7 +24,7 @@ namespace SharpProxy.Internal
                 _args.Add(param.Name, args[i]);
             }
 
-            MethodInvocationHandlerEventArgs e = new MethodInvocationHandlerEventArgs(callingMethod.GetBaseDefinition(), _args);
+            MethodInvocationHandlerEventArgs e = new MethodInvocationHandlerEventArgs(callingMethod, _args);
             return this.invocationHandler.HandleOnMethodInvoked(invocationHandler, e);
         }
 

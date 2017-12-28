@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Folder Include="Internal\" />
+    <Folder Include="Debugging\" />
   </ItemGroup>
 
   <ItemGroup>

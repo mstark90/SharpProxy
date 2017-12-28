@@ -9,6 +9,7 @@ namespace SharpProxy.Internal
         private AssemblyBuilder proxyContainer;
         private ModuleBuilder proxyModule;
         private Type proxyBaseType;
+        private MethodImplementationGenerator methodImplGen;
 
         public ProxyGenerator()
         {
@@ -19,6 +20,8 @@ namespace SharpProxy.Internal
             this.proxyModule = this.proxyContainer.DefineDynamicModule("SharpProxyContainer.dll");
 
             this.proxyBaseType = typeof(SharpProxyBase);
+
+            this.methodImplGen = new MethodImplementationGenerator();
         }
 
         private static ProxyGenerator m_DefaultGenerator;
@@ -70,9 +73,13 @@ namespace SharpProxy.Internal
 
             foreach(Type interfaceType in interfaces)
             {
+
                 foreach(MethodInfo method in interfaceType.GetMethods())
                 {
-                    ImplementMethodCall(proxyType, method);
+                    if (!method.IsSpecialName)
+                    {
+                        ImplementMethodCall(proxyType, method);
+                    }
                 }
 
                 foreach(PropertyInfo property in interfaceType.GetProperties())
@@ -108,73 +115,77 @@ namespace SharpProxy.Internal
                 paramTypes[i] = methodParams[i].ParameterType;
             }
 
-            MethodBuilder methodBuilder = proxyType.DefineMethod(parentMethod.Name, MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Final, parentMethod.ReturnType, paramTypes);
+            MethodBuilder methodBuilder = proxyType.DefineMethod(parentMethod.Name,
+                                                                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot,
+                                                                 parentMethod.ReturnType, paramTypes);
 
             for (int i = 0; i < methodParams.Length; i++)
             {
-                methodBuilder.DefineParameter(i + 1, methodParams[i].Attributes, methodParams[i].Name);
+                ParameterBuilder paramBuilder = methodBuilder.DefineParameter(i, methodParams[i].Attributes, methodParams[i].Name);
             }
 
             ILGenerator ilGen = methodBuilder.GetILGenerator();
 
-            LocalBuilder methodArgs = ilGen.DeclareLocal(typeof(object[]));
+            LocalBuilder methodArgs = methodImplGen.EmitParameterProcessCode(ilGen, parentMethod);
 
-            ilGen.Emit(OpCodes.Ldc_I4, methodParams.Length);
-            ilGen.Emit(OpCodes.Newarr, typeof(object));
-
-            for (int i = 0; i < methodParams.Length; i++)
-            {
-                ilGen.Emit(OpCodes.Dup);
-                ilGen.Emit(OpCodes.Ldc_I4, i);
-                ilGen.Emit(OpCodes.Ldarg, (short)(i + 1));
-                ilGen.Emit(OpCodes.Stelem_Ref);
-                
-            }
-
-            ilGen.Emit(OpCodes.Stloc, methodArgs);
-
-            ilGen.Emit(OpCodes.Ldarg_0);
-            ilGen.EmitCall(OpCodes.Call, typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static), null);
-            ilGen.Emit(OpCodes.Castclass, typeof(MethodInfo));
-
-            ilGen.Emit(OpCodes.Ldloc, methodArgs);
-
-            ilGen.Emit(OpCodes.Call, proxyBaseType.GetMethod("ProcessMethodInvocation"));
-
-            if(parentMethod.ReturnType == typeof(void))
-            {
-                ilGen.Emit(OpCodes.Pop);
-            }
-
-            ilGen.Emit(OpCodes.Ret);
+            this.methodImplGen.EmitMethodCallHandlerInvocation(ilGen, parentMethod, methodArgs, proxyBaseType.GetMethod("ProcessMethodInvocation"));
 
             return methodBuilder;
         }
 
         private PropertyBuilder ImplementPropertyCall(TypeBuilder proxyType, PropertyInfo parentProperty)
         {
-            ParameterInfo[] propertyParams = parentProperty.SetMethod.GetParameters();
-            Type[] paramTypes = new Type[propertyParams.Length];
+            Type[] indexParms = new Type[parentProperty.GetIndexParameters().Length];
 
-            for (int i = 0; i < propertyParams.Length; i++)
+            for (int i = 0; i < indexParms.Length; i++)
             {
-                paramTypes[i] = propertyParams[i].ParameterType;
+                indexParms[i] = parentProperty.GetIndexParameters()[i].ParameterType;
             }
 
             PropertyBuilder propBuilder = proxyType.DefineProperty(parentProperty.Name,
                                                                    parentProperty.Attributes,
-                                                                   parentProperty.GetMethod.ReturnType,
-                                                                   paramTypes);
+                                                                   parentProperty.PropertyType,
+                                                                   indexParms);
 
             if (parentProperty.SetMethod != null)
             {
-                MethodBuilder setMethod = ImplementMethodCall(proxyType, parentProperty.SetMethod);
+                ParameterInfo[] propertyParams = parentProperty.SetMethod.GetParameters();
+                Type[] paramTypes = new Type[propertyParams.Length];
+
+                for (int i = 0; i < propertyParams.Length; i++)
+                {
+                    paramTypes[i] = propertyParams[i].ParameterType;
+                }
+
+                MethodBuilder setMethod = proxyType.DefineMethod(parentProperty.SetMethod.Name,
+                                                                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot,
+                                                                 parentProperty.SetMethod.ReturnType, paramTypes);
+
+                ILGenerator ilGen = setMethod.GetILGenerator();
+
+                methodImplGen.EmitPropertySetCallInvocation(ilGen, parentProperty, proxyBaseType.GetMethod("ProcessPropertySetInvocation"));
+
                 propBuilder.SetSetMethod(setMethod);
             }
 
             if (parentProperty.GetMethod != null)
             {
-                MethodBuilder getMethod = ImplementMethodCall(proxyType, parentProperty.GetMethod);
+                ParameterInfo[] propertyParams = parentProperty.GetMethod.GetParameters();
+                Type[] paramTypes = new Type[propertyParams.Length];
+
+                for (int i = 0; i < propertyParams.Length; i++)
+                {
+                    paramTypes[i] = propertyParams[i].ParameterType;
+                }
+
+                MethodBuilder getMethod = proxyType.DefineMethod(parentProperty.GetMethod.Name,
+                                                                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot,
+                                                                 parentProperty.GetMethod.ReturnType, paramTypes);
+
+                ILGenerator ilGen = getMethod.GetILGenerator();
+
+                methodImplGen.EmitPropertyGetCallInvocation(ilGen, parentProperty, proxyBaseType.GetMethod("ProcessPropertyGetInvocation"));
+
                 propBuilder.SetGetMethod(getMethod);
             }
 
