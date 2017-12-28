@@ -18,7 +18,11 @@ namespace SharpProxyTest
 
             IConsoleWriter writer = Proxy.Get<IConsoleWriter>(invocationManager, typeof(IConsoleWriter));
 
+            Proxy.SaveGeneratedProxies("SharpProxyContainer.dll");
+
             writer.Value = "Michael";
+
+            writer.Write("Hello, {0}!");
 
             writer.Write("Hello, {0}!");
         }

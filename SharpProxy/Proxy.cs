@@ -10,6 +10,11 @@ namespace SharpProxy
         {
         }
 
+        public static void SaveGeneratedProxies(string fileName)
+        {
+            ProxyGenerator.DefaultGenerator.GeneratedAssembly.Save(fileName);
+        }
+
         public static object Get(InvocationHandlerManager invocationManager, params Type[] interfaces)
         {
             Type proxyType = ProxyGenerator.DefaultGenerator.CreateProxy(interfaces);

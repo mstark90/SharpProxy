@@ -15,7 +15,7 @@ namespace SharpProxy.Internal
         {
             AssemblyName assemblyName = new AssemblyName("SharpProxyContainer");
 
-            this.proxyContainer = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+            this.proxyContainer = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
 
             this.proxyModule = this.proxyContainer.DefineDynamicModule("SharpProxyContainer.dll");
 
@@ -36,6 +36,14 @@ namespace SharpProxy.Internal
                 }
 
                 return m_DefaultGenerator;
+            }
+        }
+
+        public AssemblyBuilder GeneratedAssembly
+        {
+            get
+            {
+                return proxyContainer;
             }
         }
 
@@ -163,7 +171,7 @@ namespace SharpProxy.Internal
 
                 ILGenerator ilGen = setMethod.GetILGenerator();
 
-                methodImplGen.EmitPropertySetCallInvocation(ilGen, parentProperty, proxyBaseType.GetMethod("ProcessPropertySetInvocation"));
+                methodImplGen.EmitPropertyCallInvocation(ilGen, parentProperty, proxyBaseType.GetMethod("ProcessPropertySetInvocation"), true);
 
                 propBuilder.SetSetMethod(setMethod);
             }
@@ -184,7 +192,7 @@ namespace SharpProxy.Internal
 
                 ILGenerator ilGen = getMethod.GetILGenerator();
 
-                methodImplGen.EmitPropertyGetCallInvocation(ilGen, parentProperty, proxyBaseType.GetMethod("ProcessPropertyGetInvocation"));
+                methodImplGen.EmitPropertyCallInvocation(ilGen, parentProperty, proxyBaseType.GetMethod("ProcessPropertyGetInvocation"), false);
 
                 propBuilder.SetGetMethod(getMethod);
             }

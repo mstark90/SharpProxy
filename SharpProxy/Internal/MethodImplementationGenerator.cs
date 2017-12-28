@@ -38,6 +38,8 @@ namespace SharpProxy.Internal
         {
             ilGen.Emit(OpCodes.Ldarg_0);
             ilGen.Emit(OpCodes.Ldtoken, parentMethod);
+            ilGen.Emit(OpCodes.Ldtoken, parentMethod.DeclaringType);
+            ilGen.Emit(OpCodes.Call, typeof(MethodBase).GetMethod("GetMethodFromHandle", new Type[] { typeof(RuntimeMethodHandle), typeof(RuntimeTypeHandle) }));
 
             ilGen.Emit(OpCodes.Ldloc, args);
 
@@ -51,36 +53,34 @@ namespace SharpProxy.Internal
             ilGen.Emit(OpCodes.Ret);
         }
 
-        public void EmitPropertySetCallInvocation(ILGenerator ilGen,
-                                               PropertyInfo property, MethodInfo handler)
+        private void EmitLoadPropertyInfo(ILGenerator ilGen, PropertyInfo property)
         {
-            ilGen.Emit(OpCodes.Ldarg_0);
-
             ilGen.Emit(OpCodes.Ldtoken, property.DeclaringType);
+            ilGen.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle"));
             ilGen.Emit(OpCodes.Ldstr, property.Name);
             ilGen.Emit(OpCodes.Ldtoken, property.PropertyType);
+            ilGen.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle"));
             ilGen.Emit(OpCodes.Call, this.getPropertyHandle);
-
-            ilGen.Emit(OpCodes.Ldarg_1);
-
-            ilGen.Emit(OpCodes.Call, handler);
-
-            ilGen.Emit(OpCodes.Pop);
-
-            ilGen.Emit(OpCodes.Ret);
         }
 
-        public void EmitPropertyGetCallInvocation(ILGenerator ilGen,
-                                               PropertyInfo property, MethodInfo handler)
+        public void EmitPropertyCallInvocation(ILGenerator ilGen,
+                                               PropertyInfo property, MethodInfo handler, bool isSetMethod)
         {
             ilGen.Emit(OpCodes.Ldarg_0);
 
-            ilGen.Emit(OpCodes.Ldtoken, property.DeclaringType);
-            ilGen.Emit(OpCodes.Ldstr, property.Name);
-            ilGen.Emit(OpCodes.Ldtoken, property.PropertyType);
-            ilGen.Emit(OpCodes.Call, this.getPropertyHandle);
+            EmitLoadPropertyInfo(ilGen, property);
+
+            if (isSetMethod)
+            {
+                ilGen.Emit(OpCodes.Ldarg_1);
+            }
 
             ilGen.Emit(OpCodes.Call, handler);
+
+            if (isSetMethod)
+            {
+                ilGen.Emit(OpCodes.Pop);
+            }
 
             ilGen.Emit(OpCodes.Ret);
         }
